@@ -1,0 +1,257 @@
+import cv2
+import threading
+import sys
+import copy
+import numpy as np
+import os
+import RPi.GPIO as GPIO
+import time
+import lcd_i2c
+
+GPIO.setmode(GPIO.BCM)
+speed = 0.004
+pin1= 6
+pin2= 19
+pin3= 13
+pin4= 26
+
+
+
+out3Down = 12
+out2Up= 16
+out2Down = 20
+out1Up= 21
+
+Btn = [[17,27,22],\
+        [out1Up,0],\
+        [out2Up,out2Down],\
+        [0,out3Down]]
+
+
+floor = 3
+btnState = []
+btnState.append([])
+
+for i in range(floor):
+    btnState[0].append(0)
+    btnState.append([])
+    btnState[i+1].append(0)
+    btnState[i+1].append(0)
+
+
+
+
+def my_callback(channel):
+    for i in range(len(Btn)):
+        for j in range(len(Btn[i])):
+            if Btn[i][j] == channel:
+                btnState[i][j] = 1
+    print(btnState)
+
+
+for i in range(len(Btn)):
+    for j in range(len(Btn[i])):
+        if Btn[i][j] != 0:
+            GPIO.setup(Btn[i][j], GPIO.IN, pull_up_down=GPIO.PUD_UP)
+            GPIO.add_event_detect(Btn[i][j], GPIO.FALLING, callback=my_callback)
+
+GPIO.setup(pin1 , GPIO.OUT)
+GPIO.setup(pin2 , GPIO.OUT)
+GPIO.setup(pin3 , GPIO.OUT)
+GPIO.setup(pin4 , GPIO.OUT)
+
+def back(step):
+    global speed
+    for i in range(step):
+        GPIO.output(pin4,True)
+        GPIO.output(pin3,False)
+        GPIO.output(pin2,True)
+        GPIO.output(pin1,False)
+
+        time.sleep(speed)
+        GPIO.output(pin4,False)
+        GPIO.output(pin3,True)
+        GPIO.output(pin2,True)
+        GPIO.output(pin1,False)
+
+        time.sleep(speed)
+        GPIO.output(pin4,False)
+        GPIO.output(pin3,True)
+        GPIO.output(pin2,False)
+        GPIO.output(pin1,True)
+
+        time.sleep(speed)
+        GPIO.output(pin4,True)
+        GPIO.output(pin3,False)
+        GPIO.output(pin2,False)
+        GPIO.output(pin1,True)
+
+        time.sleep(speed)
+
+    GPIO.output(pin1,False)
+    GPIO.output(pin2,False)
+    GPIO.output(pin3,False)
+    GPIO.output(pin4,False)
+def go(step):
+    global speed
+    for i in range(step):
+        GPIO.output(pin1,True)
+        GPIO.output(pin2,False)
+        GPIO.output(pin3,True)
+        GPIO.output(pin4,False)
+
+        time.sleep(speed)
+        GPIO.output(pin1,False)
+        GPIO.output(pin2,True)
+        GPIO.output(pin3,True)
+        GPIO.output(pin4,False)
+
+        time.sleep(speed)
+        GPIO.output(pin1,False)
+        GPIO.output(pin2,True)
+        GPIO.output(pin3,False)
+        GPIO.output(pin4,True)
+
+        time.sleep(speed)
+        GPIO.output(pin1,True)
+        GPIO.output(pin2,False)
+        GPIO.output(pin3,False)
+        GPIO.output(pin4,True)
+        time.sleep(speed)
+
+    GPIO.output(pin1,False)
+    GPIO.output(pin2,False)
+    GPIO.output(pin3,False)
+    GPIO.output(pin4,False)
+
+upIng =1 
+downIng = -1
+stop = 0
+
+state = stop
+eleLoc = 1
+goal = 1
+
+Up =0
+Down = 1
+global fullEle
+fullEle = 100
+
+
+def vd(): 
+    global fullEle
+    video_capture = cv2.VideoCapture(-1)
+    a  = 1
+    while True:
+        a+=1
+        ret, frame1 = video_capture.read()
+        ret, frame1 = video_capture.read()
+        frame1 = frame1[9:395,144:510]
+        frame = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
+        cv2.imshow('1', frame)
+        cv2.waitKey(1)
+        ret,frame = cv2.threshold(frame,150,255,cv2.THRESH_BINARY)
+        cv2.imshow('2', frame) 
+        cv2.waitKey(1)
+        kernel = np.ones((5, 5), np.uint8)
+        result = cv2.dilate(frame, kernel, iterations = 1)
+        cv2.imshow('3', frame) 
+        cv2.waitKey(1)
+        kernel1 = np.ones((9, 9), np.uint8)
+        frame = cv2.erode(frame, kernel1, iterations = 1)
+        cv2.imshow('4', frame) 
+        cv2.waitKey(1)
+        rows,cols = frame.shape 
+        total = 0
+        if a % 10 == 0:
+            for row in frame:
+                for col in row:
+                    if col == 255:
+                        total+=1
+            fullEle = total * 100 / (rows * cols)
+	#print(rows,cols) 
+        contours, hierarchy = cv2.findContours(frame,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+        for i in range(len(contours)):
+            cnt = contours[i] 
+            area = cv2.contourArea(cnt) 
+            #cv2.drawContours(frame1, contours, -1, (0,255,0), 1)
+        #print( total , rows*cols  , total * 100 / (rows * cols))
+        cv2.imwrite('pic.jpg', frame1)
+        cv2.imshow('pic.jpg', frame1)
+        if cv2.waitKey(3) & 0xFF == ord('q'):
+            break
+
+
+
+    video_capture.release()
+
+t1 = threading.Thread(target = vd) 
+t1.daemon = True
+t1.start()
+
+
+def eleOpen():
+    print("open")
+    time.sleep(5)
+    print("close")
+
+lcd_i2c.lcd_init()
+lcd_i2c.lcd_string("   Start !!" ,lcd_i2c.LCD_LINE_1)
+
+lcdTime = 0
+while True:
+    if time.time() - lcdTime > 1:
+        lcdTime = time.time()
+
+    if eleLoc == goal: # 목표 위치 설정
+        for i in range(len(btnState)):
+            for j in range(len(btnState[i])):
+                #print(i,j,btnState[i][j])
+                if btnState[i][j] == 1:
+                    if i == 0:
+                        goal = j+1
+                    else:
+                        goal = i
+
+        if btnState[0][eleLoc-1] == 1:
+            eleOpen()
+            btnState[0][eleLoc-1] = 0
+
+        elif btnState[eleLoc][Up] == 1:
+            eleOpen()
+            btnState[eleLoc][Up] = 0
+
+        elif btnState[eleLoc][Down] == 1:
+            eleOpen()
+            btnState[eleLoc][Down] = 0
+
+
+    if eleLoc < goal:
+        lcd_i2c.lcd_string(str(int(fullEle)) + "%",lcd_i2c.LCD_LINE_1)
+        lcd_i2c.lcd_string("Location="+str(eleLoc) ,lcd_i2c.LCD_LINE_2)
+        go(1000)
+        eleLoc += 1
+        print("up", eleLoc, goal, fullEle)
+        if fullEle > 10:
+            if btnState[eleLoc][Up]== 1:
+                btnState[0][eleLoc-1] = 0
+                btnState[eleLoc][Up]= 0
+                eleOpen()
+
+    elif eleLoc > goal:
+        lcd_i2c.lcd_string(str(int(fullEle)) + "%",lcd_i2c.LCD_LINE_1)
+        lcd_i2c.lcd_string("Location="+str(eleLoc) ,lcd_i2c.LCD_LINE_2)
+        back(1000)
+        eleLoc -= 1
+        print("down", eleLoc, goal, fullEle)
+        if fullEle > 10:
+            if btnState[eleLoc][Down]== 1:
+                eleOpen()
+                btnState[0][eleLoc-1] = 0
+                btnState[eleLoc][Down]= 0
+
+
+
+    #if btnState[0][eleLoc-1] == 1:
+    #    eleOpen()
+    #    btnState[0][eleLoc-1] = 0

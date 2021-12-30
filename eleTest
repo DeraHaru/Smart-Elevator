@@ -1,0 +1,186 @@
+import RPi.GPIO as GPIO
+import time
+
+GPIO.setmode(GPIO.BCM)
+speed = 0.003
+pin1= 6
+pin2= 19
+pin3= 13
+pin4= 26
+
+
+
+out3Down = 12
+out2Up= 16
+out2Down = 20
+out1Up= 21
+
+Btn = [[17,27,22],\
+        [out1Up,0],\
+        [out2Up,out2Down],\
+        [0,out3Down]]
+
+
+floor = 3
+btnState = []
+btnState.append([])
+
+for i in range(floor):
+    btnState[0].append(0)
+    btnState.append([])
+    btnState[i+1].append(0)
+    btnState[i+1].append(0)
+
+
+
+
+def my_callback(channel):
+    for i in range(len(Btn)):
+        for j in range(len(Btn[i])):
+            if Btn[i][j] == channel:
+                btnState[i][j] = 1
+    print(btnState)
+
+
+for i in range(len(Btn)):
+    for j in range(len(Btn[i])):
+        if Btn[i][j] != 0:
+            GPIO.setup(Btn[i][j], GPIO.IN, pull_up_down=GPIO.PUD_UP)
+            GPIO.add_event_detect(Btn[i][j], GPIO.FALLING, callback=my_callback)
+
+GPIO.setup(pin1 , GPIO.OUT)
+GPIO.setup(pin2 , GPIO.OUT)
+GPIO.setup(pin3 , GPIO.OUT)
+GPIO.setup(pin4 , GPIO.OUT)
+
+def back(step):
+    global speed
+    for i in range(step):
+        GPIO.output(pin4,True)
+        GPIO.output(pin3,False)
+        GPIO.output(pin2,True)
+        GPIO.output(pin1,False)
+
+        time.sleep(speed)
+        GPIO.output(pin4,False)
+        GPIO.output(pin3,True)
+        GPIO.output(pin2,True)
+        GPIO.output(pin1,False)
+
+        time.sleep(speed)
+        GPIO.output(pin4,False)
+        GPIO.output(pin3,True)
+        GPIO.output(pin2,False)
+        GPIO.output(pin1,True)
+
+        time.sleep(speed)
+        GPIO.output(pin4,True)
+        GPIO.output(pin3,False)
+        GPIO.output(pin2,False)
+        GPIO.output(pin1,True)
+
+        time.sleep(speed)
+    GPIO.output(pin1,False)
+    GPIO.output(pin2,False)
+    GPIO.output(pin3,False)
+    GPIO.output(pin4,False)
+def go(step):
+    global speed
+    for i in range(step):
+        GPIO.output(pin1,True)
+        GPIO.output(pin2,False)
+        GPIO.output(pin3,True)
+        GPIO.output(pin4,False)
+
+        time.sleep(speed)
+        GPIO.output(pin1,False)
+        GPIO.output(pin2,True)
+        GPIO.output(pin3,True)
+        GPIO.output(pin4,False)
+
+        time.sleep(speed)
+        GPIO.output(pin1,False)
+        GPIO.output(pin2,True)
+        GPIO.output(pin3,False)
+        GPIO.output(pin4,True)
+
+        time.sleep(speed)
+        GPIO.output(pin1,True)
+        GPIO.output(pin2,False)
+        GPIO.output(pin3,False)
+        GPIO.output(pin4,True)
+        time.sleep(speed)
+    GPIO.output(pin1,False)
+    GPIO.output(pin2,False)
+    GPIO.output(pin3,False)
+    GPIO.output(pin4,False)
+#go(1024)
+#back(1024)
+
+upIng =1 
+downIng = -1
+stop = 0
+
+state = stop
+eleLoc = 1
+goal = 1
+
+Up =0
+Down = 1
+fullEle = 0
+
+def eleOpen():
+    print("open")
+    time.sleep(1)
+
+while True:
+    if eleLoc == goal: # 목표 위치 설정
+        for i in range(len(btnState)):
+            for j in range(len(btnState[i])):
+                #print(i,j,btnState[i][j])
+                if btnState[i][j] == 1:
+                    if i == 0:
+                        goal = j+1
+                    else:
+                        goal = i
+        if btnState[0][eleLoc-1] == 1:
+            eleOpen()
+            btnState[0][eleLoc-1] = 0
+        elif btnState[eleLoc][Up] == 1:
+            eleOpen()
+            btnState[eleLoc][Up] = 0
+        elif btnState[eleLoc][Down] == 1:
+            eleOpen()
+            btnState[eleLoc][Down] = 0
+
+
+    if eleLoc < goal:
+        print("up", eleLoc, goal)
+        #go(1024)
+        eleLoc += 1
+        if fullEle == 0:
+            if btnState[eleLoc][Up]== 1:
+                btnState[0][eleLoc-1] = 0
+                btnState[eleLoc][Up]= 0
+                eleOpen()
+
+    elif eleLoc > goal:
+        print("down", eleLoc, goal)
+        #back(1024)
+        eleLoc -= 1
+        if fullEle == 0:
+            if btnState[eleLoc][Down]== 1:
+                eleOpen()
+                btnState[0][eleLoc-1] = 0
+                btnState[eleLoc][Down]= 0
+
+
+
+    if btnState[0][eleLoc-1] == 1:
+        eleOpen()
+        btnState[0][eleLoc-1] = 0
+
+
+
+    print("state", eleLoc, goal)
+    time.sleep(1)

@@ -1,0 +1,60 @@
+import cv2
+import threading
+import sys
+import copy
+import numpy as np
+import os
+import RPi.GPIO as GPIO
+import time
+
+sendTime = 0
+video_capture = cv2.VideoCapture(-1)
+
+keyLoc = []
+
+
+while True:
+    ret, frame1 = video_capture.read()
+    frame1 = frame1[9:395,144:510]
+    frame = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
+    cv2.imshow('1', frame)
+    ret,frame = cv2.threshold(frame,150,255,cv2.THRESH_BINARY)
+    cv2.imshow('2', frame)
+
+    kernel = np.ones((5, 5), np.uint8)
+    result = cv2.dilate(frame, kernel, iterations = 1)
+    cv2.imshow('3', frame)
+
+    kernel1 = np.ones((9, 9), np.uint8)
+    frame = cv2.erode(frame, kernel1, iterations = 1)
+    cv2.imshow('4', frame)
+    cv2.waitKey(3)
+
+    #rows,cols = frame.shape
+
+    total = 0
+    #for row in frame:
+    #    for col in row:
+    #        if col == 255:
+    #            total+=1
+    #print(rows,cols)
+
+
+    contours, hierarchy = cv2.findContours(frame,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+    for i in range(len(contours)):
+        cnt = contours[i]
+        area = cv2.contourArea(cnt)
+        if area > 100:
+            cv2.drawContours(frame1, [cnt], -1,(255,255,0), 2)
+
+
+    #cv2.drawContours(frame1, contours, -1, (0,255,0), 1)
+    #print( total , rows*cols  , total * 100 / (rows * cols))
+    #cv2.imwrite('pic.jpg', frame1)
+    cv2.imshow('pic.jpg', frame1)
+    if cv2.waitKey(3) & 0xFF == ord('q'):
+        break
+
+
+
+video_capture.release()
